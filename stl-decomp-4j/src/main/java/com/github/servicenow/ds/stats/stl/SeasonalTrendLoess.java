@@ -7,7 +7,7 @@ import static com.github.servicenow.ds.stats.TimeSeriesUtilities.simpleMovingAve
 /**
  * Java implementation of the Seasonal-Trend-Loess algorithm for evenly spaced data. This is basically a direct port of
  * the RATFOR from the netlib stl package.
- *
+ * <p>
  * Created by Jim Crotinger on 18-Apr-2016.
  */
 public class SeasonalTrendLoess {
@@ -44,7 +44,7 @@ public class SeasonalTrendLoess {
 
 		private Integer fTrendWidth = null;
 		private Integer fTrendJump = null;
-		private int fTrendDegree = 1;
+		private Integer fTrendDegree = null;
 
 		private Integer fLowpassWidth = null;
 		private Integer fLowpassJump = null;
@@ -58,6 +58,8 @@ public class SeasonalTrendLoess {
 		// Following the R interface, we implement a "periodic" flag that defaults to false.
 
 		private boolean fPeriodic = false;
+		private boolean fFlatTrend = false;
+		private boolean fLinearTrend = false;
 
 		private LoessSettings buildSettings(int width, int degree, Integer jump) {
 			if (jump == null) {
@@ -69,10 +71,10 @@ public class SeasonalTrendLoess {
 
 		/**
 		 * Set the period length for the STL seasonal decomposition.
-		 *
+		 * <p>
 		 * Required - no default.
 		 *
-		 * @param period
+		 * @param period period length (number of data points in each season or period)
 		 * @return this
 		 */
 		public Builder setPeriodLength(int period) {
@@ -85,10 +87,10 @@ public class SeasonalTrendLoess {
 
 		/**
 		 * Set the LOESS width (in data points) used to smooth the seasonal sub-series.
-		 *
+		 * <p>
 		 * Required unless setPeriodic is called.
 		 *
-		 * @param width
+		 * @param width LOESS width for the seasonal sub-series
 		 * @return this
 		 */
 		public Builder setSeasonalWidth(int width) {
@@ -98,10 +100,10 @@ public class SeasonalTrendLoess {
 
 		/**
 		 * Set the LOESS degree used to smooth the seasonal sub-series.
-		 *
+		 * <p>
 		 * Defaults to 1.
 		 *
-		 * @param degree
+		 * @param degree LOESS degree for the seasonal sub-series
 		 * @return this
 		 */
 		public Builder setSeasonalDegree(int degree) {
@@ -111,10 +113,10 @@ public class SeasonalTrendLoess {
 
 		/**
 		 * Set the jump (number of points to skip) between LOESS interpolations when smoothing the seasonal sub-series.
-		 *
+		 * <p>
 		 * Defaults to 10% of the smoother width.
 		 *
-		 * @param jump
+		 * @param jump LOESS jump (number of points to skip) for the seasonal sub-series
 		 * @return this
 		 */
 		public Builder setSeasonalJump(int jump) {
@@ -124,10 +126,10 @@ public class SeasonalTrendLoess {
 
 		/**
 		 * Set the LOESS width (in data points) used to smooth the trend.
-		 *
+		 * <p>
 		 * Defaults to (int) (1.5 * periodLength / (1 - 1.5 / seasonalWidth) + 0.5)
 		 *
-		 * @param width
+		 * @param width LOESS with for the trend component
 		 * @return this
 		 */
 		public Builder setTrendWidth(int width) {
@@ -137,10 +139,10 @@ public class SeasonalTrendLoess {
 
 		/**
 		 * Set the LOESS degree used to smooth the trend.
-		 *
+		 * <p>
 		 * Defaults to 1.
 		 *
-		 * @param degree
+		 * @param degree LOESS degree for the trend component
 		 * @return this
 		 */
 		public Builder setTrendDegree(int degree) {
@@ -150,10 +152,10 @@ public class SeasonalTrendLoess {
 
 		/**
 		 * Set the jump (number of points to skip) between LOESS interpolations used when smoothing the trend.
-		 *
+		 * <p>
 		 * Defaults to 10% of the smoother width.
 		 *
-		 * @param jump
+		 * @param jump LOESS jump (number of points to skip) for the trend component
 		 * @return this
 		 */
 		public Builder setTrendJump(int jump) {
@@ -163,10 +165,10 @@ public class SeasonalTrendLoess {
 
 		/**
 		 * Set the LOESS width (in data points) used by the low-pass filter step.
-		 *
+		 * <p>
 		 * Defaults to the period length.
 		 *
-		 * @param width
+		 * @param width LOESS width for the low-pass step
 		 * @return this
 		 */
 		public Builder setLowpassWidth(int width) {
@@ -176,10 +178,10 @@ public class SeasonalTrendLoess {
 
 		/**
 		 * Set the LOESS degree used by the low-pass filter step.
-		 *
+		 * <p>
 		 * Defaults to 1.
 		 *
-		 * @param degree
+		 * @param degree LOESS degree for the low-pass step
 		 * @return this
 		 */
 		public Builder setLowpassDegree(int degree) {
@@ -189,10 +191,10 @@ public class SeasonalTrendLoess {
 
 		/**
 		 * Set the jump (number of points to skip) between LOESS interpolations used by the low-pass filter step.
-		 *
+		 * <p>
 		 * Defaults to 10% of the smoother width.
 		 *
-		 * @param jump
+		 * @param jump LOESS jump (number of points to skip) for the low-pass step
 		 * @return this
 		 */
 		public Builder setLowpassJump(int jump) {
@@ -202,10 +204,10 @@ public class SeasonalTrendLoess {
 
 		/**
 		 * Set the number of STL inner iterations.
-		 *
+		 * <p>
 		 * Required, but also set by setRobust, setNonRobust, setRobustFlag.
 		 *
-		 * @param ni
+		 * @param ni number of inner iterations
 		 * @return this
 		 */
 		public Builder setInnerIterations(int ni) {
@@ -215,10 +217,10 @@ public class SeasonalTrendLoess {
 
 		/**
 		 * Set the number of STL robustness (outer) iterations.
-		 *
+		 * <p>
 		 * Required, but also set by setRobust, setNonRobust, setRobustFlag.
 		 *
-		 * @param no
+		 * @param no number of outer iterations
 		 * @return this
 		 */
 		public Builder setRobustnessIterations(int no) {
@@ -251,7 +253,7 @@ public class SeasonalTrendLoess {
 		/**
 		 * Set the robustness according to a flag; e.g. setRobust if true, setNonRobust if false.
 		 *
-		 * @param robust
+		 * @param robust true to be robust
 		 * @return this
 		 */
 		public Builder setRobustFlag(boolean robust) {
@@ -265,6 +267,28 @@ public class SeasonalTrendLoess {
 		 */
 		public Builder setPeriodic() {
 			fPeriodic = true;
+			return this;
+		}
+
+		/**
+		 * Set the trend smoother force a flat trend. (Degree == 0, Large Loess Width)
+		 *
+		 * @return this
+		 */
+		public Builder setFlatTrend() {
+			fLinearTrend = false;
+			fFlatTrend = true;
+			return this;
+		}
+
+		/**
+		 * Set the trend smoother force a linear trend. (Degree == 1, Large Loess Width)
+		 *
+		 * @return this
+		 */
+		public Builder setLinearTrend() {
+			fFlatTrend = false;
+			fLinearTrend = true;
 			return this;
 		}
 
@@ -285,6 +309,16 @@ public class SeasonalTrendLoess {
 			}
 
 			LoessSettings seasonalSettings = buildSettings(fSeasonalWidth, fSeasonalDegree, fSeasonalJump);
+
+			if (fFlatTrend) {
+				fTrendWidth = 100 * fPeriodLength * data.length;
+				fTrendDegree = 0;
+			} else if (fLinearTrend) {
+				fTrendWidth = 100 * fPeriodLength * data.length;
+				fTrendDegree = 1;
+			} else if (fTrendDegree == null) {
+				fTrendDegree = 1;
+			}
 
 			if (fTrendWidth == null)
 				fTrendWidth = calcDefaultTrendWidth(fPeriodLength, fSeasonalWidth);
@@ -310,6 +344,14 @@ public class SeasonalTrendLoess {
 				throw new IllegalArgumentException(
 						"SeasonalTrendLoess.Builder: Data array must be non-null");
 
+			if (fPeriodLength == null)
+				throw new IllegalArgumentException(
+						"SeasonalTrendLoess.Builder: Period Length must be specified");
+
+			if (data.length < 2 * fPeriodLength)
+				throw new IllegalArgumentException(
+						"SeasonalTrendLoess.Builder: Data series must be at least 2 * periodicity in length");
+
 			if (fPeriodic) {
 				if (fSeasonalWidth != null)
 					throw new IllegalArgumentException(
@@ -328,31 +370,37 @@ public class SeasonalTrendLoess {
 							"SeasonalTrendLoess.Builder: setSeasonalWidth or setPeriodic must be called.");
 			}
 
-			if (fPeriodLength == null)
-				throw new IllegalArgumentException(
-						"SeasonalTrendLoess.Builder: Period Length must be specified");
+			if (fFlatTrend || fLinearTrend) {
+				if (fTrendWidth != null)
+					throw new IllegalArgumentException(
+							"SeasonalTrendLoess.Builder: setTrendWidth incompatible with flat/linear trend.");
 
-			if (data.length < 2 * fPeriodLength)
-				throw new IllegalArgumentException(
-						"SeasonalTrendLoess.Builder: Data series must be at least 2 * periodicity in length");
+				if (fTrendDegree != null)
+					throw new IllegalArgumentException(
+							"SeasonalTrendLoess.Builder: setTrendDegree incompatible with flat/linear trend.");
+
+				if (fTrendJump != null)
+					throw new IllegalArgumentException(
+							"SeasonalTrendLoess.Builder: setTrendJump incompatible with flat/linear trend.");
+			}
 		}
 	}
 
 	/**
 	 * Construct STL specifying full details of the LOESS smoothers via LoessSettings objects.
 	 *
-	 * @param data             - the data to be decomposed
-	 * @param periodicity      - the periodicity of the data
-	 * @param ni               - the number of inner iterations
-	 * @param no               - the number of outer "robustness" iterations
-	 * @param seasonalSettings - the settings for the LOESS smoother for the cyclic sub-series
-	 * @param trendSettings    - the settings for the LOESS smoother for the trend component
-	 * @param lowpassSettings  - the settings for the LOESS smoother used in de-seasonalizing
+	 * @param data             the data to be decomposed
+	 * @param periodicity      the periodicity of the data
+	 * @param ni               the number of inner iterations
+	 * @param no               the number of outer "robustness" iterations
+	 * @param seasonalSettings the settings for the LOESS smoother for the cyclic sub-series
+	 * @param trendSettings    the settings for the LOESS smoother for the trend component
+	 * @param lowpassSettings  the settings for the LOESS smoother used in de-seasonalizing
 	 */
 	// Could be private but causes a hidden class to be generated in order for the Builder to have access.
 	@SuppressWarnings("WeakerAccess")
 	SeasonalTrendLoess(double[] data, int periodicity, int ni, int no, LoessSettings seasonalSettings,
-                       LoessSettings trendSettings, LoessSettings lowpassSettings) {
+	                   LoessSettings trendSettings, LoessSettings lowpassSettings) {
 
 		fData = data;
 
@@ -389,7 +437,7 @@ public class SeasonalTrendLoess {
 
 	/**
 	 * Factory method to perform a non-robust STL decomposition enforcing strict periodicity.
-	 *
+	 * <p>
 	 * Meant for diagnostic purposes only.
 	 *
 	 * @param data        the data to analyze
@@ -420,7 +468,7 @@ public class SeasonalTrendLoess {
 
 	/**
 	 * Factory method to perform a (somewhat) robust STL decomposition enforcing strict periodicity.
-	 *
+	 * <p>
 	 * Meant for diagnostic purposes only.
 	 *
 	 * @param data        the data to analyze
@@ -462,10 +510,10 @@ public class SeasonalTrendLoess {
 
 		/**
 		 * Initialize Decomposition object from the original data.
-		 *
+		 * <p>
 		 * Allocates space for the decomposition and initializes the weights to 1.
 		 *
-		 * @param data
+		 * @param data input data
 		 */
 		Decomposition(double[] data) {
 			fData = data;
@@ -551,7 +599,7 @@ public class SeasonalTrendLoess {
 			// superfluous work when the number is odd.
 
 			final int mi0 = (fData.length + 1) / 2 - 1; // n = 5, mi0 = 2; n = 4, mi0 = 1
-			final int mi1 = fData.length - mi0 - 1;		// n = 5, mi1 = 2; n = 4, mi1 = 2
+			final int mi1 = fData.length - mi0 - 1;        // n = 5, mi1 = 2; n = 4, mi1 = 2
 
 			final double sixMad = 3.0 * (fWeights[mi0] + fWeights[mi1]);
 			final double c999 = 0.999 * sixMad;
@@ -574,8 +622,7 @@ public class SeasonalTrendLoess {
 		/**
 		 * Smooth the STL seasonal component with quadratic LOESS and recompute the residual.
 		 *
-		 * @param width
-		 *            the width of the LOESS smoother used to smooth the seasonal component.
+		 * @param width the width of the LOESS smoother used to smooth the seasonal component.
 		 */
 		public void smoothSeasonal(int width) {
 			// Quadratic smoothing of the seasonal component.
@@ -588,6 +635,8 @@ public class SeasonalTrendLoess {
 
 			LoessSmoother seasonalSmoother = builder.setData(fSeasonal).build();
 			double[] smoothedSeasonal = seasonalSmoother.smooth();
+
+			// TODO: Calculate the variance reduction in smoothing the seasonal.
 
 			// Update the seasonal with the smoothed values.
 
@@ -662,7 +711,7 @@ public class SeasonalTrendLoess {
 	}
 
 	/**
-	 * The lowpass calculation takes the extended seasonal results and smoothes them with three moving averages and a
+	 * The lowpass calculation takes the extended seasonal results and smooths them with three moving averages and a
 	 * LOESS smoother to remove the seasonality.
 	 */
 	private void removeSeasonality() {
@@ -675,15 +724,15 @@ public class SeasonalTrendLoess {
 		//
 		// and the length after each pass is.................................
 		double[] pass1 = simpleMovingAverage(fExtendedSeasonal, fPeriodLength); // data.length + periodLength + 1
-		double[] pass2 = simpleMovingAverage(pass1, fPeriodLength);				// data.length + 2
-		double[] pass3 = simpleMovingAverage(pass2, 3);							// data.length
+		double[] pass2 = simpleMovingAverage(pass1, fPeriodLength);                // data.length + 2
+		double[] pass3 = simpleMovingAverage(pass2, 3);                            // data.length
 
 		// assert pass3.length == fData.length; // testing sanity check.
 
 		LoessSmoother lowPassLoess = fLowpassLoessFactory.setData(pass3).build();
 		fDeSeasonalized = lowPassLoess.smooth();
 
-	    // dumpDebugData("lowpass", fDeSeasonalized);
+		// dumpDebugData("lowpass", fDeSeasonalized);
 	}
 
 	/**
@@ -718,12 +767,12 @@ public class SeasonalTrendLoess {
 	public String toString() {
 		return String.format(
 				"SeasonalTrendLoess: [\n" +
-				"inner iterations     = %d\n" +
-				"outer iterations     = %d\n" +
-				"periodicity          = %d\n" +
-				"seasonality settings = %s\n" +
-				"trend settings       = %s\n" +
-				"lowpass settings     = %s\n]",
+						"inner iterations     = %d\n" +
+						"outer iterations     = %d\n" +
+						"periodicity          = %d\n" +
+						"seasonality settings = %s\n" +
+						"trend settings       = %s\n" +
+						"lowpass settings     = %s\n]",
 				this.fInnerIterations, this.fRobustIterations, this.fPeriodLength,
 				this.fSeasonalSettings, this.fTrendSettings, this.fLowpassSettings);
 	}
