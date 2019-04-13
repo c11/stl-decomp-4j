@@ -353,11 +353,17 @@ public class SeasonalTrendLoess {
 						"SeasonalTrendLoess.Builder: Data series must be at least 2 * periodicity in length");
 
 			if (fPeriodic) {
-				if (fSeasonalWidth != null)
+				int massiveWidth = 100 * data.length;
+
+				boolean periodicConsistent =
+						fSeasonalDegree != null && fSeasonalWidth != null &&
+						fSeasonalWidth ==  massiveWidth && fSeasonalDegree == 0;
+
+				if (fSeasonalWidth != null && !periodicConsistent)
 					throw new IllegalArgumentException(
 							"SeasonalTrendLoess.Builder: setSeasonalWidth and setPeriodic cannot both be called.");
 
-				if (fSeasonalDegree != null)
+				if (fSeasonalDegree != null && !periodicConsistent)
 					throw new IllegalArgumentException(
 							"SeasonalTrendLoess.Builder: setSeasonalDegree and setPeriodic cannot both be called.");
 
@@ -370,18 +376,44 @@ public class SeasonalTrendLoess {
 							"SeasonalTrendLoess.Builder: setSeasonalWidth or setPeriodic must be called.");
 			}
 
-			if (fFlatTrend || fLinearTrend) {
-				if (fTrendWidth != null)
-					throw new IllegalArgumentException(
-							"SeasonalTrendLoess.Builder: setTrendWidth incompatible with flat/linear trend.");
+			if (fFlatTrend) {
 
-				if (fTrendDegree != null)
+				int massiveWidth = 100 * fPeriodLength * data.length;
+
+				boolean flatTrendConsistent = fTrendWidth != null && fTrendDegree != null &&
+						fTrendWidth == massiveWidth && fTrendDegree == 0;
+
+				if (fTrendWidth != null && !flatTrendConsistent)
 					throw new IllegalArgumentException(
-							"SeasonalTrendLoess.Builder: setTrendDegree incompatible with flat/linear trend.");
+							"SeasonalTrendLoess.Builder: setTrendWidth incompatible with flat trend.");
+
+				if (fTrendDegree != null && !flatTrendConsistent)
+					throw new IllegalArgumentException(
+							"SeasonalTrendLoess.Builder: setTrendDegree incompatible with flat trend.");
 
 				if (fTrendJump != null)
 					throw new IllegalArgumentException(
-							"SeasonalTrendLoess.Builder: setTrendJump incompatible with flat/linear trend.");
+							"SeasonalTrendLoess.Builder: setTrendJump incompatible with flat trend.");
+			}
+
+			if (fLinearTrend) {
+
+				int massiveWidth = 100 * fPeriodLength * data.length;
+
+				boolean linearTrendConsistent = fTrendWidth != null && fTrendDegree != null &&
+						fTrendWidth == massiveWidth && fTrendDegree == 1;
+
+				if (fTrendWidth != null && !linearTrendConsistent)
+					throw new IllegalArgumentException(
+							"SeasonalTrendLoess.Builder: setTrendWidth incompatible with linear trend.");
+
+				if (fTrendDegree != null && !linearTrendConsistent)
+					throw new IllegalArgumentException(
+							"SeasonalTrendLoess.Builder: setTrendDegree incompatible with linear trend.");
+
+				if (fTrendJump != null)
+					throw new IllegalArgumentException(
+							"SeasonalTrendLoess.Builder: setTrendJump incompatible with linear trend.");
 			}
 		}
 	}
@@ -622,9 +654,26 @@ public class SeasonalTrendLoess {
 		/**
 		 * Smooth the STL seasonal component with quadratic LOESS and recompute the residual.
 		 *
-		 * @param width the width of the LOESS smoother used to smooth the seasonal component.
+		 * @param width             the width of the LOESS smoother used to smooth the seasonal component.
 		 */
 		public void smoothSeasonal(int width) {
+			smoothSeasonal(width, true);
+		}
+
+		/**
+		 * Smooth the STL seasonal component with quadratic LOESS and recompute the residual.
+		 *
+		 * @param width             the width of the LOESS smoother used to smooth the seasonal component.
+		 * @param restoreEndPoints  whether to restore the endpoints to their original values
+		 */
+		public void smoothSeasonal(int width, boolean restoreEndPoints) {
+
+			// Ensure that LOESS smoother width is odd and >= 3.
+
+			width = Math.max(3, width);
+			if (width % 2 == 0)
+				++width;
+
 			// Quadratic smoothing of the seasonal component.
 			// Do NOT perform linear interpolation between smoothed points - the quadratic spline can accommodate
 			// sharp changes and linear interpolation would cut off peaks/valleys.
@@ -640,14 +689,19 @@ public class SeasonalTrendLoess {
 
 			// Update the seasonal with the smoothed values.
 
+			// TODO: This is not very good - it causes discontinuities a the endpoints.
+			//       Better to transition to linear in the last half-smoother width.
+
 			// Restore the end-point values as the smoother will tend to over-modify these.
 
 			double s0 = fSeasonal[0];
 			double sN = fSeasonal[fSeasonal.length - 1];
 			System.arraycopy(smoothedSeasonal, 0, fSeasonal, 0, smoothedSeasonal.length);
 
-			fSeasonal[0] = s0;
-			fSeasonal[fSeasonal.length - 1] = sN;
+			if (restoreEndPoints) {
+				fSeasonal[0] = s0;
+				fSeasonal[fSeasonal.length - 1] = sN;
+			}
 
 			for (int i = 0; i < smoothedSeasonal.length; ++i)
 				fResiduals[i] = fData[i] - fTrend[i] - fSeasonal[i];
